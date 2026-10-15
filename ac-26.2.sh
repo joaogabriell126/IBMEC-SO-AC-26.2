@@ -1,13 +1,27 @@
-#!/bin/sh
+#!/bin/bash
+
+clear
+
+LARGURA=70
+borda(){
+	printf "%s\n" "`seq -s '#' $(($LARGURA + 1)) | tr -d [:digit:]`"
+}
+
+linhaDivisoria(){
+	printf "#%s#\n" "`seq -s '-' $(($LARGURA - 1)) | tr -d [:digit:]`"
+}
 
 menu(){
-	echo "##########################################################"
+	borda
 	echo "# IBMEC"
-	printf "%-40s %s\n" "Sistemas Operacionais" "Semestre 2 de 2025"
-	echo "Código IBM8940"
-	echo "Turma 8001"
-	echo "Professor: Luiz Fernando T. de Farias"
-	echo "#------------------------------------------------#"
+	printf "# %-40s %s #\n" "Sistemas Operacionais" "Semestre 2 de 2025"
+	printf "# %-45s %s #\n" "Código IBM8940" "Turma 8001"
+	echo "# Professor: Luiz Fernando T. de Farias"
+	linhaDivisoria
+	printf "# %-50s #\n" "Equipe Desenvolvedora:"
+	printf "# %+5s %s\n" "Aluno: " "João Gabriel Teodosio de Oliveira Lima"
+	printf "# %+5s %s\n" "Aluna: " "Letícia Valadão"
+	linhaDivisoria
 	echo Menu de Escolhas:
 	echo "1. Opção 1"
 	echo "2. Opção 2"
