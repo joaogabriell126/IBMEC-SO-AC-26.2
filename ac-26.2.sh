@@ -2,6 +2,11 @@
 
 clear
 
+
+# ------------------------------------------------------------------------------- #
+# FUNCOES DE APOIO 
+# ------------------------- 
+
 LARGURA=70
 borda(){
 	printf "%s\n" "`seq -s '#' $(($LARGURA + 1)) | tr -d [:digit:]`"
@@ -24,27 +29,55 @@ linha2(){
 	printf "# %s%*s%s #\n" "$txtesquerda" $espacos "" "$txtdireita" 
 }
 
+# -------------------------------------------------------------------------------- #
+# FUNCOES DO SISTEMA 
+# ------------------------
+
 menu(){
 	borda
 	linha "IBMEC"
-	linha2 "Sistemas Operacionais" "Semestre 2 de 2025"
-	linha2 "Código IBM8940" "Turma 8001"
+	linha2 "Sistemas Operacionais" "Semestre 2 de 2026"
+	linha2 "Código IBM0791" "Turma 8001"
 	linha "Professor: Luiz Fernando T. de Farias"
 	linhaDivisoria
 	linha "Equipe Desenvolvedora:"
 	linha2 "Aluno: " "João Gabriel Teodosio de Oliveira Lima"
-	linha2 "Aluna: " "Letícia Valadão"
+	linha2 "Aluna: " "Letícia Rocha Valladão"
 	linhaDivisoria
+	linha "Rio de Janeiro, "
+	linha "Hora do Sistema: "
+	borda
+
 	echo Menu de Escolhas:
-	echo "1. Opção 1"
+	echo "1. Opcao 1"
 	echo "2. Opção 2"
 	echo "3. Opção 3"
 	echo "4. Opção 4"
 	echo "5. Sair"
 }
 
+voltarParaMenu(){
+
+}
+
+
 opt1(){
-# Bloco da opção 1
+# Bloco da opção 1 -> organizador de diretorio
+# -------------------------------------- #
+# funcoes de apoio 
+# ------
+
+# ------------------------------------------- #
+# OPCAO 1/1 -> organizar por extensao apenas
+# ---------
+
+# -------------------------------------------- #
+# OPCAO 1/2 -> organizar por assunto apenas 
+# ---------
+
+# ------------------------------------------- #
+# OPCAO 1/3 -> organizar por ambos acima 
+# --------
 :
 }
 
@@ -59,7 +92,20 @@ opt3(){
 }
 
 opt4(){
-# Bloco da opção 4
+
+# Bloco da opção 4 -> gerenciador de repos git
+# --------------------------------------- #
+# funcoes de apoio
+# -------
+
+
+
+# ----------------------------------------------- #
+# OPCAO 4/1 -> Localizar repo em um diretorio
+# ------------
+
+
+ 
 :
 }
 
@@ -92,7 +138,7 @@ while true; do
 			;;
 
 		*)
-			echo "nada"
+			echo "Opcao invalida. Por favor selecione uma das opcoes acima."
 			;;
 	esac
 done
