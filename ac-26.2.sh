@@ -272,9 +272,6 @@ while true; do
 	done
 }
 
-
-}
-
 opt2(){
 # Bloco da opção 2
 :
