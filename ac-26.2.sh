@@ -1,6 +1,11 @@
 #!/bin/bash
 
-clear
+trap '' INT QUIT TSTP
+
+if [ "$(whoami)" = "root" ]; then
+	echo "Por segurança, este programa não pode ser executado como root."
+	exit 1
+fi
 
 
 # ------------------------------------------------------------------------------- #
@@ -8,12 +13,13 @@ clear
 # ------------------------- 
 
 LARGURA=70
+
 borda(){
-	printf "%s\n" "`seq -s '#' $(($LARGURA + 1)) | tr -d [:digit:]`"
+	echo "######################################################################"
 }
 
 linhaDivisoria(){
-	printf "#%s#\n" "`seq -s '-' $(($LARGURA - 1)) | tr -d [:digit:]`"
+	echo "#--------------------------------------------------------------------#"
 }
 
 linha(){
@@ -29,11 +35,16 @@ linha2(){
 	printf "# %s%*s%s #\n" "$txtesquerda" $espacos "" "$txtdireita" 
 }
 
+voltarParaMenu(){
+	echo
+	read -p "Pressione Enter para continuar..."
+}
+
 # -------------------------------------------------------------------------------- #
 # FUNCOES DO SISTEMA 
 # ------------------------
 
-menu(){
+cabecalho(){
 	borda
 	linha "IBMEC"
 	linha2 "Sistemas Operacionais" "Semestre 2 de 2026"
@@ -44,18 +55,20 @@ menu(){
 	linha2 "Aluno: " "João Gabriel Teodosio de Oliveira Lima"
 	linha2 "Aluna: " "Letícia Rocha Valladão"
 	linhaDivisoria
-	linha "Rio de Janeiro, "
-	linha "Hora do Sistema: "
+	linha "Rio de Janeiro, $(date '+%d de %B de %Y')"
+	linha "Hora do Sistema: $(date '+%H Horas e %M Minutos')"
 	borda
-
-	echo Menu de Escolhas:
-	echo "1. Opcao 1"
-	echo "2. Opção 2"
-	echo "3. Opção 3"
-	echo "4. Opção 4"
-	echo "5. Sair"
 }
 
+menu(){
+	cabecalho
+	echo "Menu de Escolhas:"
+	echo " 1) Organizador de pastas"
+	echo " 2) Opção 2"
+	echo " 3) Opção 3"
+	echo " 4) Gerenciador de repositórios git"
+	echo " 5) Finalizar o programa"
+}
 
 
 
@@ -93,13 +106,18 @@ palavras() {
 entra_na_pasta() {
 	ORG_VOLTA=$(pwd)
 
+	if [ "$1" = "" ]; then
+		echo "Nenhuma pasta informada."
+		return 1
+	fi
+
 	if ! cd "$1" 2> /dev/null; then
 		echo "A pasta não existe ou não pode ser acessada."
 		return 1
 	fi
 
 	case "$(pwd)" in
-		/|/bin|/sbin|/etc|/usr|/usr/*|/var|/System|/Library|/Applications)
+		//|/|/bin|/sbin|/etc|/usr|/usr/*|/var|/System|/Library|/Applications)
 		echo "Por segurança, pastas do sistema não podem ser organizadas."
 		cd "$ORG_VOLTA"
 		return 1
@@ -115,6 +133,8 @@ sai_da_pasta(){
 
 plano_assunto(){
 	local nome p destino qtd
+
+	echo "Analisando os arquivos..."
 
 	for nome in *; do
 		[ -f "$nome" ] || continue
@@ -162,12 +182,13 @@ executa_plano() {
 	fi
 
 	while IFS='|' read -r nome destino; do
-		mkdir -p "$destino"
+		mkdir -p "$destino" 2> /dev/null
 		if [ -e "$destino/$nome" ]; then
 			echo "  Já existe $destino/$nome, pulando."
-		else
-			mv "$nome" "$destino/"
+		elif mv "./$nome" "$destino/" 2> /dev/null; then
 			echo "  $nome  ->  $destino/"
+		else
+			echo "  Não foi possível mover $nome, pulando."
 		fi
 	done < "$ORG_PLANO"
 	echo "Pronto."
@@ -251,7 +272,11 @@ organiza_ambos() {
 # SUBMENU OPC1
 # ------
 
+
+
 while true; do
+		clear
+		cabecalho
 		echo
 		echo "Organizador de pastas:"
 		echo "1. Organizar por assunto"
@@ -267,17 +292,66 @@ while true; do
 			4) return ;;
 			*) echo "Opção inválida." ;;
 		esac
+		voltarParaMenu
 	done
 }
 
 opt2(){
 # Bloco da opção 2
-:
+
+# ------------------------------------------ #
+# SUBMENU (manter esqueleto)
+# ------------
+
+while true; do
+                clear
+                cabecalho
+                echo
+                echo "Organizador de pastas:"
+                echo "1. Organizar por assunto"
+                echo "2. Organizar por extensão"
+                echo "3. Organizar por assunto e o resto por extensão"
+                echo "4. Voltar ao menu principal"
+                read -p "Escolha uma opção: " escolha_org
+
+                case $escolha_org in
+                        1) organiza_assunto ;;
+                        2) organiza_extensao ;;
+                        3) organiza_ambos ;;
+                        4) return ;;
+                        *) echo "Opção inválida." ;;
+                esac
+                voltarParaMenu
+        done
 }
 
 opt3(){
 # Bloco da opção 3
-:
+
+# ------------------------------------------ #
+# SUBMENU (manter esqueleto)
+# ------------
+
+while true; do
+                clear
+                cabecalho
+                echo
+                echo "Organizador de pastas:"
+                echo "1. Organizar por assunto"
+                echo "2. Organizar por extensão"
+                echo "3. Organizar por assunto e o resto por extensão"
+                echo "4. Voltar ao menu principal"
+                read -p "Escolha uma opção: " escolha_org
+
+                case $escolha_org in
+                        1) organiza_assunto ;;
+                        2) organiza_extensao ;;
+                        3) organiza_ambos ;;
+                        4) return ;;
+                        *) echo "Opção inválida." ;;
+                esac
+                voltarParaMenu
+        done
 }
 
 opt4(){
@@ -322,6 +396,11 @@ git_localizar() {
 	local base lista qtd linha
 
 	read -p "  Procurar em qual pasta? " base
+
+	if [ "$base" = "" ]; then
+		echo "  Nenhuma pasta informada."
+		return
+	fi
 
 	if [ ! -d "$base" ]; then
 		echo "  A pasta '$base' não existe."
@@ -395,6 +474,8 @@ git_ultimos() {
 		return
 	fi
 
+	[ "$n" -gt "$total" ] && n=$total	
+
 	echo
 	echo "  Últimos $n de $total commit(s):"
 	git -C "$GIT_REPO" log --oneline | head -n "$n" | while read -r linha; do
@@ -417,7 +498,7 @@ git_buscar() {
 		return
 	fi
 
-	achados=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | grep -i -F "$palavra")
+	achados=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | grep -i -F -e "$palavra")
 
 	if [ "$achados" = "" ]; then
 		echo "  Nenhum commit com '$palavra' na mensagem."
@@ -435,7 +516,12 @@ git_buscar() {
 # -------------------------------------------
 # SUBMENU GIT
 # --------
+
+
+
 while true; do
+		clear
+		cabecalho
 		echo
 		echo "Gerenciador de repositórios git:"
 		echo "1. Localizar meus repositórios"
@@ -453,6 +539,7 @@ while true; do
 			5) return ;;
 			*) echo "Opção inválida." ;;
 		esac
+		voltarParaMenu
 	done
 }
 
@@ -460,20 +547,22 @@ while true; do
 # Fluxo Inicial e principal do programa
 
 while true; do
+	clear
 	menu
-	read -p "Escolha uma opção: " option
 	
+	read -p "Selecione uma opção: " option
+
 	case $option in 
 		1)
 			opt1
 			;;
 		
 		2)
-			echo "escolheu 2"
+			opt2
 			;;
 
 		3)	
-			echo "escolheu 3"
+			opt3
 			;;
 
 		4)
@@ -486,7 +575,8 @@ while true; do
 			;;
 
 		*)
-			echo "Opcao invalida. Por favor selecione uma das opcoes acima."
+			echo "Opção inválida."
+			voltarParaMenu
 			;;
 	esac
 done
