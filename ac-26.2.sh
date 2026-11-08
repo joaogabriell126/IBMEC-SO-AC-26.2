@@ -56,29 +56,218 @@ menu(){
 	echo "5. Sair"
 }
 
-voltarParaMenu(){
 
-}
 
 
 opt1(){
 # Bloco da opção 1 -> organizador de diretorio
+
+ORG_LISTA="/tmp/organizador_lista.txt"
+ORG_PLANO="/tmp/organizador_plano.txt"
+
+ORG_IGNORADAS=" para pela pelo como sobre entre desde final copia arquivo nome versao novo nova documento "
+
 # -------------------------------------- #
 # funcoes de apoio 
 # ------
 
+palavras() {
+	local base="${1%.*}"
+	local p
+	
+	echo "$base" \
+	| sed -e 's/[áàãâä]/a/g' -e 's/[ÁÀÃÂÄ]/A/g' -e 's/[éèêë]/e/g' -e 's/[ÉÈÊË]/E/g' -e 's/[íìîï]/i/g' -e 's/[ÍÌÎÏ]/I/g' -e 's/[óòõôö]/o/g' -e 's/[ÓÒÕÔÖ]/O/g'  -e 's/[úùûü]/u/g' -e 's/[ÚÙÛÜ]/U/g' \
+	 -e 's/ç/c/g' -e 's/Ç/C/g' \
+	| grep -o -E '[A-Z]?[a-z]+|[A-Z]+' \
+	| tr '[:upper:]' '[:lower:]' \
+	| while read p; do
+		[ ${#p} -lt 4 ] && continue 
+		p="${p%s}"
+		case "$ORG_IGNORADAS" in
+			*" $p "*) continue ;;
+		esac
+		echo "$p"
+	done
+}
+
+entra_na_pasta() {
+	ORG_VOLTA=$(pwd)
+
+	if ! cd "$1" 2> /dev/null; then
+		echo "A pasta não existe ou não pode ser acessada."
+		return 1
+	fi
+
+	case "$(pwd)" in
+		/|/bin|/sbin|/etc|/usr|/usr/*|/var|/System|/Library|/Applications)
+		echo "Por segurança, pastas do sistema não podem ser organizadas."
+		cd "$ORG_VOLTA"
+		return 1
+		;;
+	esac
+	return 0
+}
+
+sai_da_pasta(){
+	rm "$ORG_LISTA" "$ORG_PLANO" 2> /dev/null
+	cd "$ORG_VOLTA"
+}
+
+plano_assunto(){
+	local nome p destino qtd
+
+	for nome in *; do
+		[ -f "$nome" ] || continue
+		palavras "$nome" | while read p; do
+			echo "$p|$nome"
+		done
+	done > "$ORG_LISTA"
+
+
+	for nome in *; do
+		[ -f "$nome" ] || continue
+	
+		destino=""
+		for p in $(palavras "$nome"); do
+			qtd=$(grep "^$p|" "$ORG_LISTA" | sort -u | wc -l)
+			if [ $qtd -ge 2 ]; then
+				destino="$p"
+				break
+			fi
+		done
+
+		if [ "$destino" != "" ]; then
+			echo "$nome|$destino"
+		fi
+	done > "$ORG_PLANO"
+}
+
+executa_plano() {
+	local nome destino resp
+
+	if [ ! -s "$ORG_PLANO" ]; then
+		echo "Nada a organizar nessa pasta."
+		return
+	fi
+
+	echo "Prévia:"
+	while IFS='|' read -r nome destino; do
+		echo "  $nome  ->  $destino/"
+	done < "$ORG_PLANO"
+
+	read -r -p "Digite SIM para mover (qualquer outra coisa cancela): " resp
+	if [ "$resp" != "SIM" ]; then
+		echo "Cancelado. Nada foi movido."
+		return
+	fi
+
+	while IFS='|' read -r nome destino; do
+		mkdir -p "$destino"
+		if [ -e "$destino/$nome" ]; then
+			echo "  Já existe $destino/$nome, pulando."
+		else
+			mv "$nome" "$destino/"
+			echo "  $nome  ->  $destino/"
+		fi
+	done < "$ORG_PLANO"
+	echo "Pronto."
+}
+
+extensao_de() {
+	local ext
+	case "$1" in
+		*.*) ext="${1##*.}" ;;
+		*)   ext="" ;;
+	esac
+
+	if [ "$ext" = "" ]; then
+		echo "sem_extensao"
+	else
+		echo "$ext" | tr '[:upper:]' '[:lower:]'
+	fi
+}
+
+plano_extensao() {
+	local prefixo="$1"
+	local nome
+
+	for nome in *; do
+		[ -f "$nome" ] || continue
+
+		if cut -d'|' -f1 "$ORG_PLANO" 2> /dev/null | grep -q -x -F "$nome"; then
+			continue                         # já tem destino (assunto): pula
+		fi
+
+		echo "$nome|$prefixo$(extensao_de "$nome")"
+	done >> "$ORG_PLANO"
+}
+
+
 # ------------------------------------------- #
-# OPCAO 1/1 -> organizar por extensao apenas
+# OPCAO 1/1 -> organizar por assunto apenas
 # ---------
 
+organiza_assunto() {
+	local pasta
+	read  -p "Qual pasta deseja organizar? " pasta
+
+	entra_na_pasta "$pasta" || return    # se falhar, volta pro menu
+	plano_assunto
+	executa_plano
+	sai_da_pasta
+}
+
 # -------------------------------------------- #
-# OPCAO 1/2 -> organizar por assunto apenas 
+# OPCAO 1/2 -> organizar por extensao apenas 
 # ---------
+
+organiza_extensao() {
+	local pasta
+	read  -p "Qual pasta deseja organizar? " pasta
+
+	entra_na_pasta "$pasta" || return
+	rm "$ORG_PLANO" 2> /dev/null       # começa com o plano vazio
+	plano_extensao ""
+	executa_plano
+	sai_da_pasta
+}
+
 
 # ------------------------------------------- #
 # OPCAO 1/3 -> organizar por ambos acima 
 # --------
-:
+organiza_ambos() {
+	local pasta
+	read  -p "Qual pasta deseja organizar? " pasta
+
+	entra_na_pasta "$pasta" || return
+	plano_assunto                      # primeiro, os que têm assunto
+	plano_extensao "outros/"           # depois, o resto vai por extensão
+	executa_plano
+	sai_da_pasta
+}
+
+#--------------------------------------------- #
+# SUBMENU OPC1
+# ------
+
+while true; do
+		echo
+		echo "Organizador de pastas:"
+		echo "1. Organizar por assunto"
+		echo "2. Organizar por extensão"
+		echo "3. Organizar por assunto e o resto por extensão"
+		echo "4. Voltar ao menu principal"
+		read -p "Escolha uma opção: " escolha_org
+
+		case $escolha_org in
+			1) organiza_assunto ;;
+			2) organiza_extensao ;;
+			3) organiza_ambos ;;
+			4) return ;;
+			*) echo "Opção inválida." ;;
+		esac
+	done
 }
 
 opt2(){
@@ -98,17 +287,176 @@ opt4(){
 # funcoes de apoio
 # -------
 
+git_eh_numero() {
+	[ "$1" -gt 0 ] 2> /dev/null
+}
+
+git_pede_repo() {
+	local pasta
+	read -p "  Qual a pasta do repositório? " pasta
+
+	if [ "$pasta" = "" ]; then
+		echo "  Nenhuma pasta informada."
+		return 1
+	fi
+	if [ ! -d "$pasta" ]; then
+		echo "  A pasta '$pasta' não existe."
+		return 1
+	fi
+	# Todo repositório git tem uma pasta oculta .git dentro dele
+	if [ ! -d "$pasta/.git" ]; then
+		echo "  '$pasta' não é um repositório git (não tem a pasta .git)."
+		return 1
+	fi
+
+	GIT_REPO="$pasta"
+	return 0
+}
 
 
 # ----------------------------------------------- #
 # OPCAO 4/1 -> Localizar repo em um diretorio
 # ------------
 
+git_localizar() {
+	local base lista qtd linha
 
- 
-:
+	read -p "  Procurar em qual pasta? " base
+
+	if [ ! -d "$base" ]; then
+		echo "  A pasta '$base' não existe."
+		return
+	fi
+
+	echo "  Procurando (até 10 níveis de profundidade)..."
+
+	# 2>/dev/null esconde os avisos de pastas sem permissão de leitura
+	lista=$(find "$base" -maxdepth 10 -type d -name .git 2>/dev/null | sort)
+
+	if [ "$lista" = "" ]; then
+		echo "  Nenhum repositório encontrado."
+		return
+	fi
+
+	# [FORA DA AULA] tr -d ' ': no Mac o wc põe espaços antes do número
+	qtd=$(echo "$lista" | wc -l | tr -d ' ')
+	echo "  $qtd repositório(s) encontrado(s):"
+	echo "$lista" | while read -r linha; do
+		echo "    ${linha%/.git}"
+	done
 }
 
+# ---------------------------------------------------- #
+# OPCAO 4/2 -> Situacao atual
+# --------------
+
+git_situacao() {
+	git_pede_repo || return
+
+	local branch mudancas qtd linha
+	branch=$(git -C "$GIT_REPO" branch --show-current)
+	mudancas=$(git -c core.quotePath=false -C "$GIT_REPO" status --short)
+
+	echo
+	echo "  Branch atual: $branch"
+
+	if [ "$mudancas" = "" ]; then
+		echo "  Nenhum arquivo modificado. Está tudo commitado."
+		return
+	fi
+
+	qtd=$(echo "$mudancas" | wc -l | tr -d ' ')
+	echo "  $qtd arquivo(s) com mudança:"
+	# IFS= aqui importa: as linhas do status começam com espaço (" M a.txt"),
+	# e sem ele o read apagaria esse espaço e as colunas ficariam tortas
+	echo "$mudancas" | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+	echo "  (M = modificado, A = adicionado, ?? = novo, não acompanhado)"
+}
+
+# ---------------------------------------------------- #
+# OPCAO 4/3 -> ultimos commits
+# --------------
+
+git_ultimos() {
+	git_pede_repo || return
+
+	local n total linha
+	read -p "  Quantos commits quer ver? " n
+	if ! git_eh_numero "$n"; then
+		echo "  '$n' não é um número válido."
+		return
+	fi
+
+	total=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | wc -l | tr -d ' ')
+	if [ "$total" -eq 0 ]; then
+		echo "  Esse repositório ainda não tem nenhum commit."
+		return
+	fi
+
+	echo
+	echo "  Últimos $n de $total commit(s):"
+	git -C "$GIT_REPO" log --oneline | head -n "$n" | while read -r linha; do
+		echo "    $linha"
+	done
+}
+
+
+# --------------------------------------------------------- #
+# OPCAO 4/4 -> busca em commits
+# ---------------- 
+
+git_buscar() {
+	git_pede_repo || return
+
+	local palavra achados qtd linha
+	read -p "  Buscar qual palavra nas mensagens? " palavra
+	if [ "$palavra" = "" ]; then
+		echo "  Nenhuma palavra informada."
+		return
+	fi
+
+	achados=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | grep -i -F "$palavra")
+
+	if [ "$achados" = "" ]; then
+		echo "  Nenhum commit com '$palavra' na mensagem."
+		return
+	fi
+
+	qtd=$(echo "$achados" | wc -l | tr -d ' ')
+	echo
+	echo "  $qtd commit(s) com '$palavra':"
+	echo "$achados" | while read -r linha; do
+		echo "    $linha"
+	done
+}
+
+# -------------------------------------------
+# SUBMENU GIT
+# --------
+while true; do
+		echo
+		echo "Gerenciador de repositórios git:"
+		echo "1. Localizar meus repositórios"
+		echo "2. Ver situação de um repositório"
+		echo "3. Ver últimos commits"
+		echo "4. Buscar no histórico"
+		echo "5. Voltar ao menu principal"
+		read -p "Escolha uma opção: " escolha_git
+
+		case $escolha_git in
+			1) git_localizar ;;
+			2) git_situacao ;;
+			3) git_ultimos ;;
+			4) git_buscar ;;
+			5) return ;;
+			*) echo "Opção inválida." ;;
+		esac
+	done
+}
+
+# --------------------------------------------------
 # Fluxo Inicial e principal do programa
 
 while true; do
@@ -117,7 +465,7 @@ while true; do
 	
 	case $option in 
 		1)
-			echo "escolheu 1"
+			opt1
 			;;
 		
 		2)
@@ -129,7 +477,7 @@ while true; do
 			;;
 
 		4)
-		 	echo "escolheu 4"
+		 	opt4
 			;;
 
 
