@@ -64,8 +64,8 @@ menu(){
 	cabecalho
 	echo "Menu de Escolhas:"
 	echo " 1) Organizador de pastas"
-	echo " 2) Opção 2"
-	echo " 3) Opção 3"
+	echo " 2) Compactador de arquivos"
+	echo " 3) Monitor do sistema"
 	echo " 4) Gerenciador de repositórios git"
 	echo " 5) Finalizar o programa"
 }
@@ -297,61 +297,311 @@ while true; do
 }
 
 opt2(){
-# Bloco da opção 2
+# Bloco da opção 2 -> compactador e descompactador
+
+# --------------------------------------- #
+# funcoes de apoio
+# -------
+
+# Navegador de pastas: começa na home e o usuário escolhe por número.
+# $1 = "tudo" (mostra pastas e arquivos) ou "pastas" (só pastas)
+# $2 = título mostrado no topo
+# O caminho escolhido fica na variável CMP_ESCOLHA
+cmp_navegar() {
+	local titulo="$2"
+	local volta="$PWD"          # pasta onde o script estava, para voltar no final
+	local filtro=""
+	local PS3="  Escolha: "     # texto da pergunta do select
+	local COLUMNS itens item
+
+	[ "$1" = "pastas" ] && filtro="/$"   # "/$" = linhas que terminam com /
+
+	cd "$HOME"
+	while true; do
+		clear
+		echo "$titulo"
+		echo
+		echo "  Pasta atual: $PWD"
+		echo "  V) Voltar uma pasta   S) Selecionar esta pasta   C) Cancelar"
+		echo
+
+		# ls -p coloca / no final das pastas; o grep filtra se for só pastas
+		mapfile -t itens < <(ls -p | grep "$filtro")
+		item=""
+
+		if [ ${#itens[@]} -eq 0 ]; then
+			# Pasta vazia: o select não funciona sem itens, então lemos direto
+			echo "  (pasta vazia)"
+			read -p "$PS3" REPLY
+		else
+			# select numera os itens, lê a resposta e guarda o item em $item
+			# (COLUMNS=1 faz a lista sair em uma coluna só)
+			COLUMNS=1
+			select item in "${itens[@]}"; do
+				break
+			done
+		fi
+
+		# $REPLY = o que foi digitado (letra ou número)
+		case "$REPLY" in
+			V|v)
+				# Só volta se não estiver na home (não deixa sair dela)
+				[ "$PWD" != "$HOME" ] && cd ..
+				;;
+			S|s)
+				CMP_ESCOLHA="$PWD"
+				cd "$volta"
+				return 0
+				;;
+			C|c)
+				cd "$volta"
+				return 1
+				;;
+			*)
+				if [ -d "$item" ]; then
+					cd "$item"                     # pasta: entra nela
+				elif [ -f "$item" ]; then
+					CMP_ESCOLHA="$PWD/$item"       # arquivo: seleciona
+					cd "$volta"
+					return 0
+				fi                                 # número inválido: só redesenha
+				;;
+		esac
+	done
+}
+
+# ----------------------------------------------- #
+# OPCAO 2/1 -> compactar arquivo ou pasta
+# ------------
+
+cmp_compactar() {
+	local origem destino nome final
+
+	cmp_navegar "tudo" "Escolha o arquivo ou a pasta que deseja compactar:" || return
+	origem="$CMP_ESCOLHA"
+
+	cmp_navegar "pastas" "Escolha a pasta onde o .tar.gz será salvo:" || return
+	destino="$CMP_ESCOLHA"
+
+	nome=$(basename "$origem")
+	final="$destino/$nome.tar.gz"
+
+	echo
+	echo "  Compactando: $origem"
+
+	if [ -e "$final" ]; then
+		echo "  Já existe '$final'. Nada foi feito."
+		return
+	fi
+
+	# -c cria, -z comprime com gzip, -f diz o nome do arquivo final
+	# -C entra na pasta de origem, assim o .tar.gz não guarda o caminho inteiro
+	if tar -czf "$final" -C "$(dirname "$origem")" "$nome" 2> /dev/null; then
+		echo "  Compactado com sucesso: $final"
+		echo "  Tamanho original:   $(du -sh "$origem" | cut -f1)"
+		echo "  Tamanho compactado: $(du -sh "$final" | cut -f1)"
+	else
+		echo "  Erro ao compactar."
+		rm -f "$final"
+	fi
+}
+
+# ----------------------------------------------- #
+# OPCAO 2/2 -> descompactar arquivo
+# ------------
+
+cmp_descompactar() {
+	local arquivo destino
+
+	cmp_navegar "tudo" "Escolha o arquivo .tar.gz para descompactar:" || return
+	arquivo="$CMP_ESCOLHA"
+
+	# Confere o formato pelo final do nome
+	case "$arquivo" in
+		*.tar.gz|*.tgz) ;;
+		*)
+			echo
+			echo "  '$(basename "$arquivo")' não é um .tar.gz ou .tgz."
+			return
+			;;
+	esac
+
+	cmp_navegar "pastas" "Escolha a pasta onde os arquivos serão extraídos:" || return
+	destino="$CMP_ESCOLHA"
+
+	echo
+	# -x extrai, -z usa gzip, -k não sobrescreve o que já existe, -C escolhe a pasta
+	if tar -xzkf "$arquivo" -C "$destino" 2> /dev/null; then
+		echo "  Descompactado com sucesso em: $destino"
+	else
+		echo "  Erro ao descompactar (arquivo corrompido ou já existente no destino)."
+	fi
+}
 
 # ------------------------------------------ #
-# SUBMENU (manter esqueleto)
+# SUBMENU COMPACTADOR
 # ------------
 
 while true; do
-                clear
-                cabecalho
-                echo
-                echo "Organizador de pastas:"
-                echo "1. Organizar por assunto"
-                echo "2. Organizar por extensão"
-                echo "3. Organizar por assunto e o resto por extensão"
-                echo "4. Voltar ao menu principal"
-                read -p "Escolha uma opção: " escolha_org
+		clear
+		cabecalho
+		echo
+		echo "Compactador de arquivos:"
+		echo "1. Compactar arquivo ou pasta"
+		echo "2. Descompactar arquivo"
+		echo "3. Voltar ao menu principal"
+		read -p "Escolha uma opção: " escolha_cmp
 
-                case $escolha_org in
-                        1) organiza_assunto ;;
-                        2) organiza_extensao ;;
-                        3) organiza_ambos ;;
-                        4) return ;;
-                        *) echo "Opção inválida." ;;
-                esac
-                voltarParaMenu
-        done
+		case $escolha_cmp in
+			1) cmp_compactar ;;
+			2) cmp_descompactar ;;
+			3) return ;;
+			*) echo "Opção inválida." ;;
+		esac
+		voltarParaMenu
+	done
 }
 
 opt3(){
-# Bloco da opção 3
+# Bloco da opção 3 -> monitor do sistema e processos
+
+# ----------------------------------------------- #
+# OPCAO 3/1 -> resumo do sistema
+# ------------
+
+mon_resumo() {
+	echo
+	echo "  Ligado há: $(uptime -p | sed 's/up //')"
+	echo "  Núcleos de CPU: $(nproc)"
+	echo
+	echo "  Memória:"
+	free -h | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+	echo
+	echo "  Disco da pasta pessoal:"
+	df -h "$HOME" | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+}
+
+# ----------------------------------------------- #
+# OPCAO 3/2 -> processos que mais consomem
+# ------------
+
+mon_top() {
+	local tipo coluna linha
+	read -p "  Ordenar por (1) CPU ou (2) memória? " tipo
+
+	case $tipo in
+		1) coluna="-%cpu" ;;      # o "-" na frente ordena do maior pro menor
+		2) coluna="-%mem" ;;
+		*) echo "  Opção inválida."; return ;;
+	esac
+
+	echo
+	# head -n 11 = cabeçalho + 10 processos
+	ps -eo pid,user,%cpu,%mem,comm --sort="$coluna" | head -n 11 | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+}
+
+# ----------------------------------------------- #
+# OPCAO 3/3 -> buscar processo pelo nome
+# ------------
+
+mon_buscar() {
+	local nome achados linha
+	read -p "  Nome do processo: " nome
+
+	if [ "$nome" = "" ]; then
+		echo "  Nenhum nome informado."
+		return
+	fi
+
+	# comm = nome do programa; o grep -i ignora maiúsculas/minúsculas
+	achados=$(ps -eo pid,user,comm | grep -i -F -e "$nome")
+
+	if [ "$achados" = "" ]; then
+		echo "  Nenhum processo com '$nome' no nome."
+		return
+	fi
+
+	echo
+	echo "    PID     USUÁRIO  PROGRAMA"
+	echo "$achados" | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+}
+
+# ----------------------------------------------- #
+# OPCAO 3/4 -> encerrar um processo
+# ------------
+
+mon_encerrar() {
+	local pid dono programa resp
+	read -p "  PID do processo a encerrar: " pid
+
+	# Confere se é um número maior que zero
+	if ! [ "$pid" -gt 0 ] 2> /dev/null; then
+		echo "  '$pid' não é um PID válido."
+		return
+	fi
+
+	# ps -p mostra só aquele PID; "=" depois do campo tira o cabeçalho
+	programa=$(ps -p "$pid" -o comm= 2> /dev/null)
+	if [ "$programa" = "" ]; then
+		echo "  Não existe processo com PID $pid."
+		return
+	fi
+
+	dono=$(ps -p "$pid" -o user=)
+	if [ "$dono" != "$(whoami)" ]; then
+		echo "  Esse processo é do usuário '$dono'. Você só pode encerrar os seus."
+		return
+	fi
+
+	echo "  Processo: $programa (PID $pid)"
+	read -r -p "  Digite SIM para encerrar (qualquer outra coisa cancela): " resp
+	if [ "$resp" != "SIM" ]; then
+		echo "  Cancelado."
+		return
+	fi
+
+	# kill manda o sinal TERM: pede para o processo terminar
+	if kill "$pid" 2> /dev/null; then
+		echo "  Sinal de encerramento enviado para $programa."
+	else
+		echo "  Não foi possível encerrar o processo."
+	fi
+}
 
 # ------------------------------------------ #
-# SUBMENU (manter esqueleto)
+# SUBMENU MONITOR
 # ------------
 
 while true; do
-                clear
-                cabecalho
-                echo
-                echo "Organizador de pastas:"
-                echo "1. Organizar por assunto"
-                echo "2. Organizar por extensão"
-                echo "3. Organizar por assunto e o resto por extensão"
-                echo "4. Voltar ao menu principal"
-                read -p "Escolha uma opção: " escolha_org
+		clear
+		cabecalho
+		echo
+		echo "Monitor do sistema:"
+		echo "1. Resumo do sistema"
+		echo "2. Processos que mais consomem"
+		echo "3. Buscar processo pelo nome"
+		echo "4. Encerrar um processo"
+		echo "5. Voltar ao menu principal"
+		read -p "Escolha uma opção: " escolha_mon
 
-                case $escolha_org in
-                        1) organiza_assunto ;;
-                        2) organiza_extensao ;;
-                        3) organiza_ambos ;;
-                        4) return ;;
-                        *) echo "Opção inválida." ;;
-                esac
-                voltarParaMenu
-        done
+		case $escolha_mon in
+			1) mon_resumo ;;
+			2) mon_top ;;
+			3) mon_buscar ;;
+			4) mon_encerrar ;;
+			5) return ;;
+			*) echo "Opção inválida." ;;
+		esac
+		voltarParaMenu
+	done
 }
 
 opt4(){
