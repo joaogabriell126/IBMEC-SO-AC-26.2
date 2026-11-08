@@ -56,9 +56,7 @@ menu(){
 	echo "5. Sair"
 }
 
-voltarParaMenu(){
-:
-}
+
 
 
 opt1(){
@@ -211,7 +209,7 @@ plano_extensao() {
 
 organiza_assunto() {
 	local pasta
-	read -r -p "Qual pasta deseja organizar? " pasta
+	read  -p "Qual pasta deseja organizar? " pasta
 
 	entra_na_pasta "$pasta" || return    # se falhar, volta pro menu
 	plano_assunto
@@ -225,7 +223,7 @@ organiza_assunto() {
 
 organiza_extensao() {
 	local pasta
-	read -r -p "Qual pasta deseja organizar? " pasta
+	read  -p "Qual pasta deseja organizar? " pasta
 
 	entra_na_pasta "$pasta" || return
 	rm "$ORG_PLANO" 2> /dev/null       # começa com o plano vazio
@@ -240,7 +238,7 @@ organiza_extensao() {
 # --------
 organiza_ambos() {
 	local pasta
-	read -r -p "Qual pasta deseja organizar? " pasta
+	read  -p "Qual pasta deseja organizar? " pasta
 
 	entra_na_pasta "$pasta" || return
 	plano_assunto                      # primeiro, os que têm assunto
@@ -289,17 +287,176 @@ opt4(){
 # funcoes de apoio
 # -------
 
+git_eh_numero() {
+	[ "$1" -gt 0 ] 2> /dev/null
+}
+
+git_pede_repo() {
+	local pasta
+	read -p "  Qual a pasta do repositório? " pasta
+
+	if [ "$pasta" = "" ]; then
+		echo "  Nenhuma pasta informada."
+		return 1
+	fi
+	if [ ! -d "$pasta" ]; then
+		echo "  A pasta '$pasta' não existe."
+		return 1
+	fi
+	# Todo repositório git tem uma pasta oculta .git dentro dele
+	if [ ! -d "$pasta/.git" ]; then
+		echo "  '$pasta' não é um repositório git (não tem a pasta .git)."
+		return 1
+	fi
+
+	GIT_REPO="$pasta"
+	return 0
+}
 
 
 # ----------------------------------------------- #
 # OPCAO 4/1 -> Localizar repo em um diretorio
 # ------------
 
+git_localizar() {
+	local base lista qtd linha
 
- 
-:
+	read -p "  Procurar em qual pasta? " base
+
+	if [ ! -d "$base" ]; then
+		echo "  A pasta '$base' não existe."
+		return
+	fi
+
+	echo "  Procurando (até 10 níveis de profundidade)..."
+
+	# 2>/dev/null esconde os avisos de pastas sem permissão de leitura
+	lista=$(find "$base" -maxdepth 10 -type d -name .git 2>/dev/null | sort)
+
+	if [ "$lista" = "" ]; then
+		echo "  Nenhum repositório encontrado."
+		return
+	fi
+
+	# [FORA DA AULA] tr -d ' ': no Mac o wc põe espaços antes do número
+	qtd=$(echo "$lista" | wc -l | tr -d ' ')
+	echo "  $qtd repositório(s) encontrado(s):"
+	echo "$lista" | while read -r linha; do
+		echo "    ${linha%/.git}"
+	done
 }
 
+# ---------------------------------------------------- #
+# OPCAO 4/2 -> Situacao atual
+# --------------
+
+git_situacao() {
+	git_pede_repo || return
+
+	local branch mudancas qtd linha
+	branch=$(git -C "$GIT_REPO" branch --show-current)
+	mudancas=$(git -c core.quotePath=false -C "$GIT_REPO" status --short)
+
+	echo
+	echo "  Branch atual: $branch"
+
+	if [ "$mudancas" = "" ]; then
+		echo "  Nenhum arquivo modificado. Está tudo commitado."
+		return
+	fi
+
+	qtd=$(echo "$mudancas" | wc -l | tr -d ' ')
+	echo "  $qtd arquivo(s) com mudança:"
+	# IFS= aqui importa: as linhas do status começam com espaço (" M a.txt"),
+	# e sem ele o read apagaria esse espaço e as colunas ficariam tortas
+	echo "$mudancas" | while IFS= read -r linha; do
+		echo "    $linha"
+	done
+	echo "  (M = modificado, A = adicionado, ?? = novo, não acompanhado)"
+}
+
+# ---------------------------------------------------- #
+# OPCAO 4/3 -> ultimos commits
+# --------------
+
+git_ultimos() {
+	git_pede_repo || return
+
+	local n total linha
+	read -p "  Quantos commits quer ver? " n
+	if ! git_eh_numero "$n"; then
+		echo "  '$n' não é um número válido."
+		return
+	fi
+
+	total=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | wc -l | tr -d ' ')
+	if [ "$total" -eq 0 ]; then
+		echo "  Esse repositório ainda não tem nenhum commit."
+		return
+	fi
+
+	echo
+	echo "  Últimos $n de $total commit(s):"
+	git -C "$GIT_REPO" log --oneline | head -n "$n" | while read -r linha; do
+		echo "    $linha"
+	done
+}
+
+
+# --------------------------------------------------------- #
+# OPCAO 4/4 -> busca em commits
+# ---------------- 
+
+git_buscar() {
+	git_pede_repo || return
+
+	local palavra achados qtd linha
+	read -p "  Buscar qual palavra nas mensagens? " palavra
+	if [ "$palavra" = "" ]; then
+		echo "  Nenhuma palavra informada."
+		return
+	fi
+
+	achados=$(git -C "$GIT_REPO" log --oneline 2>/dev/null | grep -i -F "$palavra")
+
+	if [ "$achados" = "" ]; then
+		echo "  Nenhum commit com '$palavra' na mensagem."
+		return
+	fi
+
+	qtd=$(echo "$achados" | wc -l | tr -d ' ')
+	echo
+	echo "  $qtd commit(s) com '$palavra':"
+	echo "$achados" | while read -r linha; do
+		echo "    $linha"
+	done
+}
+
+# -------------------------------------------
+# SUBMENU GIT
+# --------
+while true; do
+		echo
+		echo "Gerenciador de repositórios git:"
+		echo "1. Localizar meus repositórios"
+		echo "2. Ver situação de um repositório"
+		echo "3. Ver últimos commits"
+		echo "4. Buscar no histórico"
+		echo "5. Voltar ao menu principal"
+		read -p "Escolha uma opção: " escolha_git
+
+		case $escolha_git in
+			1) git_localizar ;;
+			2) git_situacao ;;
+			3) git_ultimos ;;
+			4) git_buscar ;;
+			5) return ;;
+			*) echo "Opção inválida." ;;
+		esac
+	done
+}
+
+# --------------------------------------------------
 # Fluxo Inicial e principal do programa
 
 while true; do
@@ -320,7 +477,7 @@ while true; do
 			;;
 
 		4)
-		 	echo "escolheu 4"
+		 	opt4
 			;;
 
 
