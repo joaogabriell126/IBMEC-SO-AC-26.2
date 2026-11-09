@@ -548,6 +548,12 @@ mon_encerrar() {
 		return
 	fi
 
+	# $$ = PID deste script; $PPID = PID de quem abriu o script (o terminal)
+	if [ "$pid" -eq $$ ] || [ "$pid" -eq "$PPID" ]; then
+		echo "  Esse processo é o próprio programa (ou o terminal dele). Não pode ser encerrado aqui."
+		return
+	fi
+
 	# ps -p mostra só aquele PID; "=" depois do campo tira o cabeçalho
 	programa=$(ps -p "$pid" -o comm= 2> /dev/null)
 	if [ "$programa" = "" ]; then
