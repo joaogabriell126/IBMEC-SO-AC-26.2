@@ -556,23 +556,23 @@ mon_top() {
 }
 
 # ----------------------------------------------- #
-# OPCAO 3/3 -> buscar processo pelo nome
+# OPCAO 3/3 -> buscar processo (nome, usuário ou PID)
 # ------------
 
 mon_buscar() {
 	local nome achados linha
-	read -p "  Nome do processo: " nome
+	read -p "  Nome, usuário ou PID do processo: " nome
 
 	if [ "$nome" = "" ]; then
-		echo "  Nenhum nome informado."
+		echo "  Nada foi informado."
 		return
 	fi
 
-	# comm = nome do programa; o grep -i ignora maiúsculas/minúsculas
-	achados=$(ps -eo pid,user,comm | grep -i -F -e "$nome")
+	# "=" depois de cada campo tira a linha de título; o grep -i ignora maiúsculas/minúsculas
+	achados=$(ps -eo pid=,user=,comm= | grep -i -F -e "$nome")
 
 	if [ "$achados" = "" ]; then
-		echo "  Nenhum processo com '$nome' no nome."
+		echo "  Nenhum processo com '$nome' no nome, usuário ou PID."
 		return
 	fi
 
@@ -642,7 +642,7 @@ while true; do
 		echo "Monitor do sistema:"
 		echo "1. Resumo do sistema"
 		echo "2. Processos que mais consomem"
-		echo "3. Buscar processo pelo nome"
+		echo "3. Buscar processo (nome, usuário ou PID)"
 		echo "4. Encerrar um processo"
 		echo "5. Voltar ao menu principal"
 		read -p "Escolha uma opção: " escolha_mon
