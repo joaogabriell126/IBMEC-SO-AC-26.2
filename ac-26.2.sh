@@ -366,6 +366,8 @@ cmp_navegar() {
 	cd "$HOME"
 	while true; do
 		clear
+		cabecalho
+		echo
 		echo "$titulo"
 		echo
 		echo "  Pasta atual: $PWD"
