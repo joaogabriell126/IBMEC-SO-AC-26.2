@@ -14,6 +14,10 @@ fi
 
 LARGURA=70
 
+AZUL='\033[1;34m'
+VERDE='\033[3;32m'
+NORMAL='\033[0m'
+
 borda(){
 	echo "######################################################################"
 }
@@ -35,6 +39,24 @@ linha2(){
 	printf "# %s%*s%s #\n" "$txtesquerda" $espacos "" "$txtdireita" 
 }
 
+# O sistema não tem o português instalado, então traduzimos o mês na mão
+nomeDoMes(){
+	case $(date '+%m') in
+		01) echo "Janeiro" ;;
+		02) echo "Fevereiro" ;;
+		03) echo "Março" ;;
+		04) echo "Abril" ;;
+		05) echo "Maio" ;;
+		06) echo "Junho" ;;
+		07) echo "Julho" ;;
+		08) echo "Agosto" ;;
+		09) echo "Setembro" ;;
+		10) echo "Outubro" ;;
+		11) echo "Novembro" ;;
+		12) echo "Dezembro" ;;
+	esac
+}
+
 voltarParaMenu(){
 	echo
 	read -p "Pressione Enter para continuar..."
@@ -45,18 +67,43 @@ voltarParaMenu(){
 # ------------------------
 
 cabecalho(){
+	dia=$(date '+%d')
+	mes=$(nomeDoMes)
+	ano=$(date '+%Y')
+	hora=$(date '+%H')
+	minuto=$(date '+%M')
+
+	# Até junho é o 1º semestre, depois é o 2º
+	if [ $(date '+%m') -le 6 ]; then
+		semestre=1
+	else
+		semestre=2
+	fi
+
 	borda
 	linha "IBMEC"
-	linha2 "Sistemas Operacionais" "Semestre 2 de 2026"
+	texto="Sistemas OperacionaisSemestre $semestre de $ano"
+	espacos=$((LARGURA - 4 - ${#texto}))
+	printf "# Sistemas Operacionais%*sSemestre ${AZUL}$semestre${NORMAL} de ${AZUL}$ano${NORMAL} #\n" $espacos ""
 	linha2 "Código IBM0791" "Turma 8001"
 	linha "Professor: Luiz Fernando T. de Farias"
 	linhaDivisoria
 	linha "Equipe Desenvolvedora:"
-	linha2 "Aluno: " "João Gabriel Teodosio de Oliveira Lima"
-	linha2 "Aluna: " "Letícia Rocha Valladão"
+	texto="Aluno: João Gabriel Teodosio de Oliveira Lima"
+	espacos=$((LARGURA - 4 - ${#texto}))
+	printf "# Aluno: %*s${VERDE}João Gabriel Teodosio de Oliveira Lima${NORMAL} #\n" $espacos ""
+
+	texto="Aluna: Letícia Rocha Valladão"
+	espacos=$((LARGURA - 4 - ${#texto}))
+	printf "# Aluna: %*s${VERDE}Letícia Rocha Valladão${NORMAL} #\n" $espacos ""
 	linhaDivisoria
-	linha "Rio de Janeiro, $(date '+%d de %B de %Y')"
-	linha "Hora do Sistema: $(date '+%H Horas e %M Minutos')"
+	texto="Rio de Janeiro, $dia de $mes de $ano"
+	espacos=$((LARGURA - 4 - ${#texto}))
+	printf "# Rio de Janeiro, ${AZUL}$dia${NORMAL} de ${AZUL}$mes${NORMAL} de ${AZUL}$ano${NORMAL}%*s #\n" $espacos ""
+
+	texto="Hora do Sistema: $hora Horas e $minuto Minutos"
+	espacos=$((LARGURA - 4 - ${#texto}))
+	printf "# Hora do Sistema: ${AZUL}$hora${NORMAL} Horas e ${AZUL}$minuto${NORMAL} Minutos%*s #\n" $espacos ""
 	borda
 }
 
